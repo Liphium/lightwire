@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cpal = "0.15.3"
+opus = { git = "https://github.com/SpaceManiac/opus-rs", version = "0.3.0" }
+opusic-sys = "0.5.1"
