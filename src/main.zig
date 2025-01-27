@@ -1,10 +1,13 @@
 const std = @import("std");
 const hello = @import("hello.zig");
+const pa = @import("portaudio");
 
 pub fn main() !void {
     const a = 2;
     const b = 2;
     const added = hello.add(a, b);
+    std.log.info("PortAudio loaded", .{});
+    std.log.info("hello {?}", .{pa});
     std.log.info("This is some stuff added: {d} + {d} = {d}", .{ a, b, added });
 }
 

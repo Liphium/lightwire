@@ -75,3 +75,16 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 }
+
+const pa_src_common = &.{
+    "src/common/pa_allocation.c",
+    "src/common/pa_converters.c",
+    "src/common/pa_cpuload.c",
+    "src/common/pa_debugprint.c",
+    "src/common/pa_dither.c",
+    "src/common/pa_front.c",
+    "src/common/pa_process.c",
+    "src/common/pa_ringbuffer.c",
+    "src/common/pa_stream.c",
+    "src/common/pa_trace.c",
+};
