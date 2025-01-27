@@ -1,3 +1,0 @@
-[submodule "dependencies/miniaudio"]
-	path = dependencies/miniaudio
-	url = https://github.com/mackron/miniaudio
