@@ -1,3 +1,0 @@
-[submodule "dependencies/portaudio"]
-	path = dependencies/portaudio
-	url = https://github.com/portaudio/portaudio
