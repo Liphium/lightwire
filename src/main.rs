@@ -4,9 +4,13 @@ use std::{
 };
 
 use cpal::traits::{HostTrait, StreamTrait};
+use engine::Engine;
 use rodio::{buffer::SamplesBuffer, DeviceTrait, OutputStream, Sink};
 
-fn main() {
+pub mod engine;
+
+#[tokio::main]
+async fn main() {
     println!("Hello, world!");
 
     let host = cpal::default_host();

@@ -7,4 +7,4 @@ edition = "2021"
 cpal = "0.15.3"
 opus = "0.3.0"
 rodio = "0.20.1"
-tokio = "1.43.0"
+tokio = { version = "1.43.0", features = ["full"] }
