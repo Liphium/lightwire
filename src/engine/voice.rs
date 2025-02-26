@@ -76,4 +76,12 @@ impl VoiceInput {
 
         stream.play().expect("Couldn't start stream");
     }
+
+    pub fn get_sample_rate(&self) -> u32 {
+        return self.sample_rate;
+    }
+
+    pub fn get_frame_size(&self) -> u32 {
+        return self.frame_size;
+    }
 }
