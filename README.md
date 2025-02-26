@@ -5,3 +5,4 @@ Lightwire is an experimental audio packetizer to potentially power voice chat on
 - [rodio](https://crates.io/crates/rodio) for playing multiple audio streams to the speaker.
 - [rubato](https://crates.io/crates/rubato) for resampling the audio for Opus.
 - [opus-rs](https://crates.io/crates/opus) for decoding and encoding using Opus.
+- [aec-rs](https://crates.io/crates/aec-rs) for echo cancellation and basic noise suppression.
