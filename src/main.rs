@@ -11,6 +11,12 @@ pub mod engine;
 
 #[tokio::main]
 async fn main() {
+    Engine::create();
+}
+
+/*
+#[tokio::main]
+async fn main() {
     println!("Hello, world!");
 
     let host = cpal::default_host();
@@ -19,7 +25,7 @@ async fn main() {
     let mut encoder = opus::Encoder::new(48000, opus::Channels::Mono, opus::Application::Voip)
         .expect("Couldn't create encoder");
     encoder
-        .set_bitrate(opus::Bitrate::Bits(10000))
+        .set_bitrate(opus::Bitrate::Bits(64000))
         .expect("Couldn't set bitrate");
 
     println!(
@@ -102,3 +108,4 @@ fn handle_data(samples: &[f32], buffer: &mut Vec<Vec<u8>>, encoder: &mut opus::E
     // Append the samples to the buffer
     buffer.push(encoded);
 }
+*/

@@ -11,7 +11,10 @@ pub struct EncodingEngine {
 
 impl EncodingEngine {
     // Start a new encoding engine
-    pub fn create(sample_rate: u32) -> (Arc<Mutex<Self>>, Sender<Vec<f32>>, Receiver<Vec<u8>>) {
+    pub fn create(
+        sample_rate: u32,
+        mut sample_receiver: Receiver<Vec<f32>>,
+    ) -> (Arc<Mutex<Self>>, Receiver<Vec<u8>>) {
         // TODO: Use rubato to resample in case of sample rate not supported by Opus
         // Create a new Opus encoder for this encoding engine
         let encoder =
@@ -25,7 +28,6 @@ impl EncodingEngine {
         }));
 
         // Create a channels for receiving the data and also sending back the encoded data
-        let (sample_sender, mut sample_receiver) = mpsc::channel(4);
         let (encoded_sender, encoded_receiver) = mpsc::channel(4);
 
         // Spawn the encoding task
@@ -56,6 +58,6 @@ impl EncodingEngine {
             }
         });
 
-        return (engine.clone(), sample_sender, encoded_receiver);
+        return (engine.clone(), encoded_receiver);
     }
 }
