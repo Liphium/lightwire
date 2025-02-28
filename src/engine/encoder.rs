@@ -1,11 +1,9 @@
 use std::sync::{Arc, Mutex};
 
 use opus::Encoder;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::mpsc::{self, Receiver};
 
 pub struct EncodingEngine {
-    sample_rate: u32,
-    frame_size: u32,
     encoder: Option<Mutex<Encoder>>,
 }
 
@@ -22,8 +20,6 @@ impl EncodingEngine {
                 .expect("Couldn't create opus encoder");
 
         let engine = Arc::new(Mutex::new(Self {
-            sample_rate,
-            frame_size: sample_rate / 50,
             encoder: Some(Mutex::new(encoder)),
         }));
 

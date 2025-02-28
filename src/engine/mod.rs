@@ -8,6 +8,7 @@ use encoder::EncodingEngine;
 use rodio::{buffer::SamplesBuffer, OutputStream, Sink};
 use voice::VoiceInput;
 
+mod decoder;
 mod encoder;
 mod voice;
 
