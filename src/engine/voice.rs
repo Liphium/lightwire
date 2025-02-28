@@ -1,6 +1,5 @@
 use std::{
     sync::{Arc, Mutex},
-    thread,
     time::Duration,
 };
 
@@ -8,7 +7,7 @@ use cpal::traits::{HostTrait, StreamTrait};
 use rodio::DeviceTrait;
 use tokio::{
     sync::mpsc::{self, Receiver},
-    task, time,
+    time,
 };
 
 pub struct VoiceInput {

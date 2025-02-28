@@ -1,11 +1,4 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
-
-use cpal::traits::{HostTrait, StreamTrait};
 use engine::Engine;
-use rodio::{buffer::SamplesBuffer, DeviceTrait, OutputStream, Sink};
 
 pub mod engine;
 
