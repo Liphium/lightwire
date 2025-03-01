@@ -1,12 +1,12 @@
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 use cpal::traits::{HostTrait, StreamTrait};
 use rodio::DeviceTrait;
 use tokio::{
-    sync::mpsc::{self, Receiver},
+    sync::{
+        mpsc::{self, Receiver},
+        Mutex,
+    },
     time,
 };
 
@@ -48,7 +48,7 @@ impl VoiceInput {
             move || {
                 // Create stream config for the device based on the channels
                 let stream_config = {
-                    let input = input.lock().unwrap();
+                    let input = input.blocking_lock();
                     if input.channels == 1 {
                         cpal::StreamConfig {
                             channels: 1,
@@ -69,7 +69,7 @@ impl VoiceInput {
 
                 // Process data if needed (e.g. convert stereo to mono)
                 let channels = {
-                    let input = input.lock().unwrap();
+                    let input = input.blocking_lock();
                     input.channels
                 };
                 let callback = {
@@ -77,7 +77,7 @@ impl VoiceInput {
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
                         // Make sure the output is not paused
                         {
-                            let input = input.lock().unwrap();
+                            let input = input.blocking_lock();
                             if input.paused {
                                 return;
                             }
@@ -99,7 +99,7 @@ impl VoiceInput {
 
                 // Start the audio stream
                 let stream = {
-                    let input = input.lock().unwrap();
+                    let input = input.blocking_lock();
                     input
                         .device
                         .build_input_stream(&stream_config, callback, err_fn, None)
@@ -110,7 +110,7 @@ impl VoiceInput {
 
                 loop {
                     {
-                        let input = input.lock().unwrap();
+                        let input = input.blocking_lock();
                         if input.stop {
                             break;
                         }

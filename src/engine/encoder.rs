@@ -1,10 +1,17 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use opus::Encoder;
-use tokio::sync::mpsc::{self, Receiver};
+use rand::Rng;
+use tokio::sync::{
+    mpsc::{self, Receiver},
+    Mutex,
+};
+
+use super::AudioPacket;
 
 pub struct EncodingEngine {
     encoder: Option<Mutex<Encoder>>,
+    current_seq: u16,
 }
 
 impl EncodingEngine {
@@ -12,7 +19,7 @@ impl EncodingEngine {
     pub fn create(
         sample_rate: u32,
         mut sample_receiver: Receiver<Vec<f32>>,
-    ) -> (Arc<Mutex<Self>>, Receiver<Vec<u8>>) {
+    ) -> (Arc<Mutex<Self>>, Receiver<AudioPacket>) {
         // TODO: Use rubato to resample in case of sample rate not supported by Opus
         // Create a new Opus encoder for this encoding engine
         let encoder =
@@ -21,6 +28,7 @@ impl EncodingEngine {
 
         let engine = Arc::new(Mutex::new(Self {
             encoder: Some(Mutex::new(encoder)),
+            current_seq: rand::rng().random(),
         }));
 
         // Create a channels for receiving the data and also sending back the encoded data
@@ -36,12 +44,17 @@ impl EncodingEngine {
                 }
 
                 // Get the encoder from the engine
-                let engine = engine.lock().expect("Couldn't lock encoding engine mutex");
+                let mut engine = engine.blocking_lock();
                 if engine.encoder.is_none() {
                     break;
                 }
+                if engine.current_seq == u16::MAX {
+                    engine.current_seq = 0;
+                } else {
+                    engine.current_seq += 1;
+                }
                 let encoder = engine.encoder.as_ref().unwrap();
-                let mut coder = encoder.lock().unwrap();
+                let mut coder = encoder.blocking_lock();
 
                 // Encode using Opus
                 let mut output = [0u8; 2000];
@@ -50,7 +63,14 @@ impl EncodingEngine {
                     .expect("Couldn't encode");
 
                 let (packet, _) = output.split_at(output_size);
-                encoded_sender.blocking_send(packet.to_vec()).ok();
+                encoded_sender
+                    .blocking_send(AudioPacket {
+                        id: None,
+                        packet: packet.to_vec(),
+                        sample_rate: sample_rate,
+                        seq: engine.current_seq,
+                    })
+                    .ok();
             }
         });
 

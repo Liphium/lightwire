@@ -1,10 +1,63 @@
+use std::{sync::Arc, time::Duration, u16};
+
 use engine::Engine;
+use jittr::JitterBuffer;
+use tokio::{
+    sync::Mutex,
+    time::{self, interval},
+};
 
 pub mod engine;
+
+#[derive(Clone)]
+struct OpusPacket {
+    pub seq: u16,
+}
+
+impl jittr::Packet for OpusPacket {
+    fn sequence_number(&self) -> u16 {
+        return self.seq;
+    }
+}
 
 #[tokio::main]
 async fn main() {
     Engine::create();
+
+    /*
+    let buffer = Arc::new(Mutex::new(JitterBuffer::<OpusPacket, 8>::new()));
+
+    let mut playback = interval(Duration::from_millis(500));
+
+    tokio::spawn({
+        let buffer = buffer.clone();
+        async move {
+            {
+                let mut buffer = buffer.lock().await;
+                buffer.push(OpusPacket { seq: u16::MAX });
+                buffer.push(OpusPacket { seq: 0 });
+                buffer.push(OpusPacket { seq: 1 });
+                buffer.push(OpusPacket { seq: 2 });
+                buffer.push(OpusPacket { seq: 4 });
+            }
+        }
+    });
+
+    time::sleep(Duration::from_millis(10)).await;
+
+    loop {
+        playback.tick().await;
+
+        let mut buffer = buffer.lock().await;
+        let packet = buffer.pop();
+        if packet.is_none() {
+            println!("failure");
+        } else {
+            println!("Now playing: {}", packet.unwrap().seq);
+        }
+    }
+
+    */
 }
 
 /*
