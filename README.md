@@ -10,3 +10,4 @@ Lightwire is an experimental audio packetizer to potentially power voice chat on
 - [aec-rs](https://crates.io/crates/aec-rs) for echo cancellation and basic noise suppression.
 
 Just a note here: Evaluate https://crates.io/crates/jittr for use in the player.
+ANOTHER NOTE: You absolute dumbass need to decode the packets after the jitter buffer has done its job (opus needs to decode the packets in the correct order, it also has automatic loss concealment, use that instead of what you currently have maybe).
