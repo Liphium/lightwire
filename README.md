@@ -9,5 +9,12 @@ Lightwire is an experimental audio packetizer to potentially power voice chat on
 - [opus-rs](https://crates.io/crates/opus) for decoding and encoding using Opus.
 - [aec-rs](https://crates.io/crates/aec-rs) for echo cancellation and basic noise suppression.
 
-Just a note here: Evaluate https://crates.io/crates/jittr for use in the player.
-ANOTHER NOTE: You absolute dumbass need to decode the packets after the jitter buffer has done its job (opus needs to decode the packets in the correct order, it also has automatic loss concealment, use that instead of what you currently have maybe).
+## To-Do
+
+- [x] Fix the bug with decoding and playing being separate and that causing Opus to not be decoded properly
+- [x] Evaluate https://crates.io/crates/jittr for use in the player (already part of the implementation c:).
+- [ ] Write a decoder and encoder for a lightwire packet format
+- [ ] Test the audio engine with an actual stream of audio
+- [ ] Add device switching
+- [ ] Add resampling to the nearest Opus-compatible sample rate (using rubato)
+- [ ] Add noise cancelling using RNNoise bindings (that I'll probably have to write myself)
