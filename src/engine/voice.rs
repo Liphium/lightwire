@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
 use cpal::traits::{HostTrait, StreamTrait};
 use rodio::DeviceTrait;
@@ -116,7 +116,7 @@ impl VoiceInput {
                         }
                     }
 
-                    time::sleep(Duration::from_millis(100));
+                    thread::sleep(Duration::from_millis(100));
                 }
             }
         });

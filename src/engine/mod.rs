@@ -36,6 +36,17 @@ impl Engine {
             playing_engine: playing_engine,
         };
     }
+
+    // Enable or disable the voice engine
+    pub fn set_voice_enabled(&self, enabled: bool) {
+        let mut input = self.voice_input.blocking_lock();
+        input.set_paused(enabled);
+    }
+
+    // Add a new target id to the engine
+    pub fn register_target(&self, id: String) {}
+
+    pub fn handle_packet(&self, id: String, packet: Vec<u8>) {}
 }
 
 #[derive(Clone)]
