@@ -63,6 +63,36 @@ impl jittr::Packet for AudioPacket {
     }
 }
 
+impl AudioPacket {
+    // Encode the audio packet to bytes
+    //
+    // Format: | seq | sample_rate | voice_data |
+    pub fn encode(&self) -> Vec<u8> {
+        let mut packet_vec = Vec::with_capacity(2 + 4 + self.packet.len());
+        packet_vec.extend_from_slice(&self.seq.to_le_bytes());
+        packet_vec.extend_from_slice(&self.sample_rate.to_le_bytes());
+        packet_vec.extend(self.packet.iter());
+        return packet_vec;
+    }
+
+    // Decode the audio packet
+    pub fn decode(bytes: Vec<u8>) -> Self {
+        let (seq_bytes, rest) = bytes.split_at(2);
+        let (sample_rate_bytes, packet) = rest.split_at(4);
+        return Self {
+            id: None,
+            seq: u16::from_le_bytes([seq_bytes[0], seq_bytes[1]]),
+            sample_rate: u32::from_le_bytes([
+                sample_rate_bytes[0],
+                sample_rate_bytes[1],
+                sample_rate_bytes[2],
+                sample_rate_bytes[3],
+            ]),
+            packet: packet.to_vec(),
+        };
+    }
+}
+
 /*
 Demo of voice input and the decoding engine (just here for maybe future idk)
 
