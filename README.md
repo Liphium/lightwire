@@ -17,4 +17,4 @@ Lightwire is an experimental audio packetizer to potentially power voice chat on
 - [ ] Test the audio engine with an actual stream of audio
 - [ ] Add device switching
 - [ ] Add resampling to the nearest Opus-compatible sample rate (using rubato)
-- [ ] Add noise cancelling using RNNoise bindings (that I'll probably have to write myself)
+- [ ] Add noise cancelling using RNNoise bindings (that I'll probably have to write myself or look at https://github.com/jneem/nnnoiseless)
