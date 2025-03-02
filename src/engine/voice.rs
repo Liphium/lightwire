@@ -47,6 +47,10 @@ impl VoiceInput {
                 let stream_config = {
                     let input = input.blocking_lock();
                     if input.channels == 1 {
+                        println!(
+                            "using mono, sample_rate={} frame_size={}",
+                            input.sample_rate, input.frame_size
+                        );
                         cpal::StreamConfig {
                             channels: 1,
                             sample_rate: cpal::SampleRate(input.sample_rate),
@@ -71,8 +75,13 @@ impl VoiceInput {
                 };
                 let callback = {
                     let input = input.clone();
+                    let mut overflow_buffer = Vec::<f32>::new();
+                    let frame_size = {
+                        let input = input.blocking_lock();
+                        input.frame_size
+                    };
                     move |data: &[f32], _: &cpal::InputCallbackInfo| {
-                        // Make sure the output is not paused
+                        // Check if paused
                         {
                             let input = input.blocking_lock();
                             if input.paused {
@@ -80,16 +89,19 @@ impl VoiceInput {
                             }
                         }
 
-                        if channels == 1 {
-                            // Directly forward it when it's mono
-                            sender.blocking_send(data.to_vec()).ok();
-                        } else {
-                            // Convert to mono audio when we're using 2 channels
-                            let mono = data
-                                .chunks(2)
-                                .map(|chunk| (chunk[0] + chunk[1]) / 2.0)
-                                .collect();
-                            sender.blocking_send(mono).ok();
+                        // Accumulate data
+                        overflow_buffer.extend_from_slice(data);
+
+                        // Dispatch complete frames
+                        while overflow_buffer.len() >= frame_size as usize {
+                            let packet: Vec<f32> =
+                                overflow_buffer.drain(0..frame_size as usize).collect();
+                            if channels == 1 {
+                                sender.blocking_send(packet).ok();
+                            } else {
+                                let mono = packet.chunks(2).map(|c| (c[0] + c[1]) * 0.5).collect();
+                                sender.blocking_send(mono).ok();
+                            }
                         }
                     }
                 };

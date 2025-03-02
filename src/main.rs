@@ -1,19 +1,67 @@
 use std::{thread, time::Duration};
+use tokio::sync::mpsc::{self, UnboundedReceiver};
 
-use engine::Engine;
+use engine::{AudioPacket, Engine};
 
 pub mod engine;
 
 #[tokio::main]
 async fn main() {
-    let engine = Engine::create(move |p| println!("packet to send: {}", p.packet.len())).await;
+    // Create a channel for sending packets from the callback to our processing task
+    let (packet_tx, packet_rx) = mpsc::unbounded_channel::<AudioPacket>();
 
-    thread::sleep(Duration::from_secs(3));
+    // Create the engine with a callback that sends packets to our channel
+    let engine = Engine::create({
+        let packet_tx = packet_tx.clone();
+        move |p| {
+            packet_tx
+                .send(p)
+                .unwrap_or_else(|_| println!("Failed to send packet to channel"));
+        }
+    })
+    .await;
+
+    // Spawn a task to process the packets
+    tokio::spawn({
+        let engine = engine.clone();
+        async move {
+            process_packets(engine, packet_rx).await;
+        }
+    });
+
+    println!("engine starting..");
+
+    thread::sleep(Duration::from_secs(1));
+
+    // Add default target
+    println!("adding target");
+    engine.register_target("default".to_string()).await;
+
+    thread::sleep(Duration::from_secs(1));
 
     println!("enabling voice");
     engine.set_voice_enabled(true).await;
 
-    thread::sleep(Duration::from_secs(3));
+    thread::sleep(Duration::from_secs(30)); // Increased time to allow testing
+}
+
+// Process packets received from the engine and send them back
+async fn process_packets(engine: Engine, mut packet_rx: UnboundedReceiver<AudioPacket>) {
+    while let Some(packet) = packet_rx.recv().await {
+        // Use default target ID for all packets in this example
+        let target_id = String::from("default");
+
+        // Encode the packet to bytes
+        let encoded_packet = packet.encode();
+
+        // Send the packet back to the engine
+        engine.handle_packet(target_id, encoded_packet).await;
+
+        println!(
+            "Packet processed and sent back to engine: seq={}",
+            packet.seq
+        );
+    }
 }
 
 /*

@@ -9,6 +9,7 @@ mod encoder;
 mod player;
 mod voice;
 
+#[derive(Clone)]
 pub struct Engine {
     voice_input: Arc<Mutex<VoiceInput>>,
     encoding_engine: Arc<Mutex<EncodingEngine>>,

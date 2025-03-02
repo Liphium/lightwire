@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, thread, time::Duration};
 
 use jittr::JitterBuffer;
 use opus::Decoder;
@@ -16,6 +16,7 @@ use super::AudioPacket;
 pub struct PlayingEngine {
     client_map: HashMap<String, Arc<Mutex<Client>>>,
     output_handle: Option<OutputStreamHandle>,
+    stop: bool,
 }
 
 struct Client {
@@ -29,18 +30,33 @@ impl PlayingEngine {
         let engine = Arc::new(Mutex::new(Self {
             client_map: HashMap::new(),
             output_handle: None,
+            stop: false,
         }));
 
         // Create a new channel for the packets coming in
         let (sender, mut receiver) = mpsc::unbounded_channel();
 
-        // Stream needs to be created on the main thread
-        let (_stream, stream_handle) =
-            OutputStream::try_default().expect("Failed to get default output stream");
-        {
-            let mut engine_lock = engine.lock().await;
-            engine_lock.output_handle = Some(stream_handle);
-        }
+        tokio::task::spawn_blocking({
+            let engine = engine.clone();
+            move || {
+                // Stream needs to be created on the main thread
+                let (_stream, stream_handle) =
+                    OutputStream::try_default().expect("Failed to get default output stream");
+                {
+                    let mut engine_lock = engine.blocking_lock();
+                    engine_lock.output_handle = Some(stream_handle);
+                }
+
+                // Start a loop to keep the stream in scope until the engine exists
+                loop {
+                    thread::sleep(Duration::from_millis(500));
+                    let engine = engine.blocking_lock();
+                    if engine.stop {
+                        return;
+                    }
+                }
+            }
+        });
 
         tokio::spawn({
             let engine = engine.clone();
@@ -100,56 +116,61 @@ impl PlayingEngine {
 
         // Spawn a task for playing the packets at a consistent interval
         tokio::spawn(async move {
-            let mut interval = time::interval(Duration::from_secs(20));
+            let mut interval = time::interval(Duration::from_millis(20));
             loop {
                 interval.tick().await;
 
                 let mut client = client.lock().await;
-                let packet = client.buffer.pop();
-                if packet.is_none() {
-                    if !client.decoder.is_none() {
-                        // TODO: Fix code below for loss concealment
-                        /*
-                        let decoder = client.decoder.as_mut().expect("Decoder not found, wtf");
-                        let mut decoded = [0f32; 2000];
-                        let frame_size = decoder
-                            .decode_float(&[], &mut decoded, false)
-                            .expect("Couldn't generate loss concealment");
-                        let (decoded, _) = decoded.split_at(frame_size);
-
-                        // Play the packet using the sink
-                        client.sink.append(SamplesBuffer::new(
-                            1,
-                            decoder.get_sample_rate().expect("Couldn't get sample rate"),
-                            decoded,
-                        ));
-                        */
+                if let Some(packet) = client.buffer.pop() {
+                    // Create a decoder in case there isn't one
+                    if client.decoder.is_none() {
+                        client.decoder = Some(
+                            opus::Decoder::new(packet.sample_rate, opus::Channels::Mono)
+                                .expect("Couldn't create decoder"),
+                        );
                     }
-                    continue;
+
+                    println!("packet received, seq={}", packet.seq);
+
+                    // Decode the packet
+                    let decoder = client.decoder.as_mut().expect("Decoder not found, wtf");
+                    let mut decoded = [0f32; 2000];
+                    let frame_size = decoder
+                        .decode_float(&packet.packet, &mut decoded, false)
+                        .expect("Couldn't decode packet");
+                    let (decoded, _) = decoded.split_at(frame_size);
+
+                    // Play the packet using the sink
+                    client
+                        .sink
+                        .append(SamplesBuffer::new(1, packet.sample_rate, decoded));
+                } else if let Some(decoder) = &mut client.decoder {
+                    // Generate loss concealment using the decoder
+                    let mut decoded = [0f32; 2000];
+                    let frame_size = decoder
+                        .decode_float(&[], &mut decoded, false)
+                        .expect("Couldn't generate loss concealment");
+                    let (decoded, _) = decoded.split_at(frame_size);
+
+                    println!("packet missing, adding seal");
+
+                    // Get the sample rate from the decoder
+                    let sample_rate = decoder
+                        .get_sample_rate()
+                        .expect("Couldn't get sample rate, weird");
+
+                    // Play the loss concealment using the sink
+                    client
+                        .sink
+                        .append(SamplesBuffer::new(1, sample_rate, decoded));
+                } else {
+                    println!("packet missing, no seal");
                 }
-                let packet = packet.unwrap();
-
-                // Create a decoder in case there isn't one
-                if client.decoder.is_none() {
-                    client.decoder = Some(
-                        opus::Decoder::new(packet.sample_rate, opus::Channels::Mono)
-                            .expect("Couldn't create decoder"),
-                    );
-                }
-
-                // Decode the packet
-                let decoder = client.decoder.as_mut().expect("Decoder not found, wtf");
-                let mut decoded = [0f32; 2000];
-                let frame_size = decoder
-                    .decode_float(&packet.packet, &mut decoded, false)
-                    .expect("Couldn't decode packet");
-                let (decoded, _) = decoded.split_at(frame_size);
-
-                // Play the packet using the sink
-                client
-                    .sink
-                    .append(SamplesBuffer::new(1, packet.sample_rate, decoded));
             }
         });
+    }
+
+    pub fn stop(&mut self) {
+        self.stop = true;
     }
 }
