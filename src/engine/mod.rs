@@ -1,12 +1,10 @@
 use std::sync::Arc;
 
-use decoder::DecodingEngine;
 use encoder::EncodingEngine;
 use player::PlayingEngine;
 use tokio::sync::Mutex;
 use voice::VoiceInput;
 
-mod decoder;
 mod encoder;
 mod player;
 mod voice;
@@ -14,7 +12,6 @@ mod voice;
 pub struct Engine {
     voice_input: Arc<Mutex<VoiceInput>>,
     encoding_engine: Arc<Mutex<EncodingEngine>>,
-    decoding_engine: Arc<Mutex<DecodingEngine>>,
     playing_engine: Arc<Mutex<PlayingEngine>>,
 }
 
@@ -29,17 +26,13 @@ impl Engine {
             EncodingEngine::create(voice_input.get_sample_rate(), receiver)
         };
 
-        // Start the decoding engine
-        let (decoding_engine, sender) = DecodingEngine::create();
-
         // Start the playing engine
-        let playing_engine = PlayingEngine::create();
+        let (playing_engine, _) = PlayingEngine::create();
 
         // Initialize the engine
         return Self {
             voice_input: voice_input,
             encoding_engine: encoding_engine,
-            decoding_engine: decoding_engine,
             playing_engine: playing_engine,
         };
     }
@@ -54,19 +47,6 @@ struct AudioPacket {
 }
 
 impl jittr::Packet for AudioPacket {
-    fn sequence_number(&self) -> u16 {
-        self.seq
-    }
-}
-
-#[derive(Clone)]
-struct DecodedPacket {
-    pub seq: u16,
-    pub sample_rate: u32,
-    pub packet: Vec<f32>,
-}
-
-impl jittr::Packet for DecodedPacket {
     fn sequence_number(&self) -> u16 {
         self.seq
     }
