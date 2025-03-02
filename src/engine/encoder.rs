@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use opus::Encoder;
 use rand::Rng;
-use tokio::sync::{
-    mpsc::{self, Receiver},
-    Mutex,
-};
+use tokio::sync::{mpsc::Receiver, Mutex};
 
 use super::AudioPacket;
 
@@ -16,10 +13,14 @@ pub struct EncodingEngine {
 
 impl EncodingEngine {
     // Start a new encoding engine
-    pub fn create(
+    pub fn create<F>(
         sample_rate: u32,
         mut sample_receiver: Receiver<Vec<f32>>,
-    ) -> (Arc<Mutex<Self>>, Receiver<AudioPacket>) {
+        mut send_fn: F,
+    ) -> Arc<Mutex<Self>>
+    where
+        F: FnMut(AudioPacket) + Send + 'static,
+    {
         // TODO: Use rubato to resample in case of sample rate not supported by Opus
         // Create a new Opus encoder for this encoding engine
         let encoder =
@@ -30,9 +31,6 @@ impl EncodingEngine {
             encoder: Some(Mutex::new(encoder)),
             current_seq: rand::rng().random(),
         }));
-
-        // Create a channels for receiving the data and also sending back the encoded data
-        let (encoded_sender, encoded_receiver) = mpsc::channel(4);
 
         // Spawn the encoding task
         tokio::task::spawn_blocking({
@@ -63,17 +61,15 @@ impl EncodingEngine {
                     .expect("Couldn't encode");
 
                 let (packet, _) = output.split_at(output_size);
-                encoded_sender
-                    .blocking_send(AudioPacket {
-                        id: None,
-                        packet: packet.to_vec(),
-                        sample_rate: sample_rate,
-                        seq: engine.current_seq,
-                    })
-                    .ok();
+                send_fn(AudioPacket {
+                    id: None,
+                    packet: packet.to_vec(),
+                    sample_rate: sample_rate,
+                    seq: engine.current_seq,
+                });
             }
         });
 
-        return (engine.clone(), encoded_receiver);
+        return engine.clone();
     }
 }

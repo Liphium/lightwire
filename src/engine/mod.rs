@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use encoder::EncodingEngine;
 use player::PlayingEngine;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc::UnboundedSender, Mutex};
 use voice::VoiceInput;
 
 mod encoder;
@@ -13,44 +13,57 @@ pub struct Engine {
     voice_input: Arc<Mutex<VoiceInput>>,
     encoding_engine: Arc<Mutex<EncodingEngine>>,
     playing_engine: Arc<Mutex<PlayingEngine>>,
+    packet_sender: UnboundedSender<AudioPacket>,
 }
 
 impl Engine {
-    pub fn create() -> Self {
+    pub async fn create<F>(send_fn: F) -> Self
+    where
+        F: FnMut(AudioPacket) + Send + 'static,
+    {
         // Create the voice input
         let (voice_input, receiver) = VoiceInput::create();
 
         // Create the encoding engine
-        let (encoding_engine, mut encoded_receiver) = {
-            let voice_input = voice_input.blocking_lock();
-            EncodingEngine::create(voice_input.get_sample_rate(), receiver)
+        let encoding_engine = {
+            let voice_input = voice_input.lock().await;
+            EncodingEngine::create(voice_input.get_sample_rate(), receiver, send_fn)
         };
 
         // Start the playing engine
-        let (playing_engine, _) = PlayingEngine::create();
+        let (playing_engine, sender) = PlayingEngine::create().await;
 
         // Initialize the engine
         return Self {
             voice_input: voice_input,
             encoding_engine: encoding_engine,
             playing_engine: playing_engine,
+            packet_sender: sender,
         };
     }
 
-    // Enable or disable the voice engine
-    pub fn set_voice_enabled(&self, enabled: bool) {
-        let mut input = self.voice_input.blocking_lock();
-        input.set_paused(enabled);
+    // Enable or disable the microphone
+    pub async fn set_voice_enabled(&self, enabled: bool) {
+        let mut input = self.voice_input.lock().await;
+        input.set_paused(!enabled);
     }
 
-    // Add a new target id to the engine
-    pub fn register_target(&self, id: String) {}
+    // Register a new target in the playing engine
+    pub async fn register_target(&self, id: String) {
+        let mut engine = self.playing_engine.lock().await;
+        engine.add_target(id);
+    }
 
-    pub fn handle_packet(&self, id: String, packet: Vec<u8>) {}
+    // Handle a packet
+    pub async fn handle_packet(&self, id: String, packet: Vec<u8>) {
+        self.packet_sender
+            .send(AudioPacket::decode(Some(id), packet))
+            .ok();
+    }
 }
 
 #[derive(Clone)]
-struct AudioPacket {
+pub struct AudioPacket {
     pub id: Option<String>,
     pub seq: u16,
     pub sample_rate: u32,
@@ -76,11 +89,13 @@ impl AudioPacket {
     }
 
     // Decode the audio packet
-    pub fn decode(bytes: Vec<u8>) -> Self {
+    //
+    // Format: | seq | sample_rate | voice_data |
+    pub fn decode(id: Option<String>, bytes: Vec<u8>) -> Self {
         let (seq_bytes, rest) = bytes.split_at(2);
         let (sample_rate_bytes, packet) = rest.split_at(4);
         return Self {
-            id: None,
+            id: id,
             seq: u16::from_le_bytes([seq_bytes[0], seq_bytes[1]]),
             sample_rate: u32::from_le_bytes([
                 sample_rate_bytes[0],

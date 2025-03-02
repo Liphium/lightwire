@@ -2,12 +2,9 @@ use std::{sync::Arc, thread, time::Duration};
 
 use cpal::traits::{HostTrait, StreamTrait};
 use rodio::DeviceTrait;
-use tokio::{
-    sync::{
-        mpsc::{self, Receiver},
-        Mutex,
-    },
-    time,
+use tokio::sync::{
+    mpsc::{self, Receiver},
+    Mutex,
 };
 
 pub struct VoiceInput {

@@ -19,14 +19,13 @@ pub struct PlayingEngine {
 }
 
 struct Client {
-    id: String,
     sink: Sink,
     buffer: JitterBuffer<AudioPacket, 8>,
     decoder: Option<Decoder>,
 }
 
 impl PlayingEngine {
-    pub fn create() -> (Arc<Mutex<PlayingEngine>>, UnboundedSender<AudioPacket>) {
+    pub async fn create() -> (Arc<Mutex<PlayingEngine>>, UnboundedSender<AudioPacket>) {
         let engine = Arc::new(Mutex::new(Self {
             client_map: HashMap::new(),
             output_handle: None,
@@ -35,28 +34,33 @@ impl PlayingEngine {
         // Create a new channel for the packets coming in
         let (sender, mut receiver) = mpsc::unbounded_channel();
 
-        tokio::task::spawn_blocking({
-            let engine = engine.clone();
-            move || {
-                // Stream needs to be created on the main thread
-                let (_stream, stream_handle) =
-                    OutputStream::try_default().expect("Failed to get default output stream");
-                {
-                    let mut engine_lock = engine.blocking_lock();
-                    engine_lock.output_handle = Some(stream_handle);
-                }
+        // Stream needs to be created on the main thread
+        let (_stream, stream_handle) =
+            OutputStream::try_default().expect("Failed to get default output stream");
+        {
+            let mut engine_lock = engine.lock().await;
+            engine_lock.output_handle = Some(stream_handle);
+        }
 
+        tokio::spawn({
+            let engine = engine.clone();
+            async move {
                 loop {
                     // Listen for new audio packets
-                    let data: Option<AudioPacket> = receiver.blocking_recv();
+                    let data = time::timeout(Duration::from_millis(500), receiver.recv()).await;
+                    if data.is_err() {
+                        println!("timeout.");
+                        continue;
+                    }
+                    let data = data.unwrap();
                     if data.is_none() {
-                        println!("playing engine has been closed.");
+                        println!("closed playing engine.");
                         return;
                     }
-                    let data = data.expect("No data found");
+                    let data: AudioPacket = data.expect("No data found");
 
                     // Make sure the client with the specified id actually exists
-                    let engine = engine.blocking_lock();
+                    let engine = engine.lock().await;
                     let client_id = data
                         .id
                         .as_ref()
@@ -71,7 +75,7 @@ impl PlayingEngine {
                         .client_map
                         .get(client_id)
                         .expect("Not found even though key exists, wtf");
-                    let mut client = client.blocking_lock();
+                    let mut client = client.lock().await;
                     client.buffer.push(data);
                 }
             }
@@ -88,7 +92,6 @@ impl PlayingEngine {
 
         // Add the target to the playing engine
         let client = Arc::new(Mutex::new(Client {
-            id: id.clone(),
             sink: sink,
             buffer: JitterBuffer::new(),
             decoder: None,
@@ -104,7 +107,24 @@ impl PlayingEngine {
                 let mut client = client.lock().await;
                 let packet = client.buffer.pop();
                 if packet.is_none() {
-                    // TODO: Use decoder for loss concealment in case there
+                    if !client.decoder.is_none() {
+                        // TODO: Fix code below for loss concealment
+                        /*
+                        let decoder = client.decoder.as_mut().expect("Decoder not found, wtf");
+                        let mut decoded = [0f32; 2000];
+                        let frame_size = decoder
+                            .decode_float(&[], &mut decoded, false)
+                            .expect("Couldn't generate loss concealment");
+                        let (decoded, _) = decoded.split_at(frame_size);
+
+                        // Play the packet using the sink
+                        client.sink.append(SamplesBuffer::new(
+                            1,
+                            decoder.get_sample_rate().expect("Couldn't get sample rate"),
+                            decoded,
+                        ));
+                        */
+                    }
                     continue;
                 }
                 let packet = packet.unwrap();
@@ -131,10 +151,5 @@ impl PlayingEngine {
                     .append(SamplesBuffer::new(1, packet.sample_rate, decoded));
             }
         });
-    }
-
-    // Get a target from the decoding engine by its ID
-    pub fn get_target(&self, id: &str) -> Option<&Arc<Mutex<Client>>> {
-        self.client_map.get(id)
     }
 }
