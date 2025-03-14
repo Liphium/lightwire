@@ -1,5 +1,7 @@
 # lightwire
 
+The repository for lightwire has been moved to the [main Liphium app repository](https://github.com/Liphium/chat_interface) where it'll be shipped as part of the chat app. You can find it in the lightwire folder over there.
+
 Lightwire is an experimental audio packetizer to potentially power voice chat on Liphium in the future. It's currently being developed in Rust using these amazing libraries:
 
 - [tokio](https://crates.io/crates/tokio) for creating threads and managing the general flow of data.
